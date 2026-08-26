@@ -1,49 +1,56 @@
 import time
 import logging
 
-logger = logging.getLogger('mouse-automation-77')
+logger = logging.getLogger("mouse-automation-77")
 
-def process_click_coordinates(x: int, y: int, screen_width: int, screen_height: int) -> tuple[int, int]:
-    """Validate and process click coordinates against screen boundaries."""
-    try:
-        # Ensure inputs are integers
-        coord_x = int(x)
-        coord_y = int(y)
-    except (TypeError, ValueError) as e:
-        logger.error(f"Invalid coordinate types provided: x={x}, y={y}. Defaulting to (0, 0).")
-        return 0, 0
+class ClickProcessor:
+    def __init__(self, config: dict):
+        self.config = config
+        self.running = False
 
-    # Check for negative values (off-screen)
-    if coord_x < 0 or coord_y < 0:
-        logger.warning(f"Negative coordinates detected ({coord_x}, {coord_y}). Clamped to boundary 0.")
-        coord_x = max(0, coord_x)
-        coord_y = max(0, coord_y)
+    def validate_inputs(self) -> bool:
+        """Validate autoclicker configuration parameters before execution."""
+        interval = self.config.get("interval")
+        clicks = self.config.get("clicks")
+        button = self.config.get("button")
 
-    # Check against maximum screen dimensions
-    if coord_x > screen_width or coord_y > screen_height:
-        logger.warning(f"Coordinates ({coord_x}, {coord_y}) exceed screen bounds ({screen_width}x{screen_height}). Clamped.")
-        coord_x = min(coord_x, screen_width)
-        coord_y = min(coord_y, screen_height)
-
-    return coord_x, coord_y
-
-def execute_click_sequence(actions: list, delay: float) -> bool:
-    """Safely execute a list of click actions with robust error handling."""
-    if not isinstance(actions, list):
-        logger.critical("Action sequence must be a valid list.")
-        return False
-
-    for index, action in enumerate(actions):
-        try:
-            if not isinstance(action, dict) or 'x' not in action or 'y' not in action:
-                raise KeyError(f"Action at index {index} is missing required keys ('x', 'y').")
-            
-            time.sleep(max(0.0, float(delay)))
-        except (KeyError, TypeError, ValueError) as err:
-            logger.error(f"Skipping malformed action at index {index}: {err}")
-            continue
-        except Exception as unexpected:
-            logger.critical(f"Unexpected error during click execution: {unexpected}")
+        if interval is None or not isinstance(interval, (int, float)) or interval < 0:
+            logger.error("Invalid interval: must be a non-negative number.")
             return False
 
-    return True
+        if clicks is None or not isinstance(clicks, int) or clicks < -1:
+            logger.error("Invalid clicks: must be an integer >= -1 (-1 for infinite).")
+            return False
+
+        if button not in ["left", "right", "middle"]:
+            logger.error(f"Invalid mouse button: {button}. Must be left, right, or middle.")
+            return False
+
+        return True
+
+    def process_loop(self):
+        """Main processing loop with integrated input validation."""
+        if not self.validate_inputs():
+            logger.critical("Input validation failed. Aborting click process.")
+            return
+
+        self.running = True
+        interval = self.config["interval"]
+        target_clicks = self.config["clicks"]
+        executed = 0
+
+        logger.info("Starting autoclicker processing loop.")
+        try:
+            while self.running:
+                if target_clicks != -1 and executed >= target_clicks:
+                    logger.info("Target click count reached. Stopping.")
+                    break
+                
+                time.sleep(interval)
+                executed += 1
+                logger.debug(f"Click executed (#{executed})")
+        except Exception as e:
+            logger.exception(f"Unexpected error during processing loop: {e}")
+        finally:
+            self.running = False
+            logger.info("Autoclicker processing loop terminated.")
