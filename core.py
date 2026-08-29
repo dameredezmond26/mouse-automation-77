@@ -1,48 +1,80 @@
 import time
-import random
-import requests
-from typing import Any, Callable, Optional
+import threading
+from typing import Optional, Dict
 
-class NetworkRetryHandler:
-    """Handles retry logic for network operations with exponential backoff."""
+try:
+    import pyautogui
+except ImportError:
+    pyautogui = None
 
-    def __init__(self, max_retries: int = 5, initial_delay: float = 1.0, max_delay: float = 30.0):
-        self.max_retries = max_retries
-        self.initial_delay = initial_delay
-        self.max_delay = max_delay
+class Core:
+    """Core module with performance optimized autoclicker logic."""
 
-    def execute(self, operation: Callable[[], Any], *args, **kwargs) -> Optional[Any]:
-        """Execute network operation with retries on failure."""
-        delay = self.initial_delay
-        last_exception = None
-        for attempt in range(1, self.max_retries + 1):
-            try:
-                result = operation(*args, **kwargs)
-                return result
-            except (requests.exceptions.RequestException, ConnectionError, TimeoutError) as e:
-                last_exception = e
-                if attempt == self.max_retries:
-                    break
-                # Apply jitter for randomized delay to avoid synchronized retries
-                jitter = random.uniform(0, 0.5)
-                sleep_time = min(delay + jitter, self.max_delay)
-                time.sleep(sleep_time)
-                delay *= 2
-        if last_exception:
-            raise last_exception
-        return None
+    def __init__(self, interval: float = 0.1):
+        self._is_running = False
+        self._worker_thread: Optional[threading.Thread] = None
+        self.interval = max(0.001, interval)
+        self._click_counter = 0
+        self._start_timestamp = 0.0
+        self._stats_lock = threading.Lock()
 
-# Example network operation for fetching automation settings
-def fetch_automation_settings(url: str) -> dict:
-    response = requests.get(url, timeout=10)
-    response.raise_for_status()
-    return response.json()
+    def _optimized_loop(self):
+        """High performance main loop with drift compensation."""
+        self._start_timestamp = time.perf_counter()
+        next_click_time = self._start_timestamp
+        while self._is_running:
+            now = time.perf_counter()
+            if now >= next_click_time:
+                if pyautogui is not None:
+                    # Direct click for speed
+                    pyautogui.click()
+                with self._stats_lock:
+                    self._click_counter += 1
+                # Update next target, accounts for execution time
+                next_click_time += self.interval
+            # Calculate remaining time to next click
+            remaining = next_click_time - now
+            if remaining > 0.002:
+                time.sleep(remaining - 0.001)
+            elif remaining > 0:
+                # Short sleep for precision without high CPU
+                time.sleep(0.0005)
+            else:
+                # Yield CPU if behind schedule
+                time.sleep(0)
 
-# Practical usage example
-if __name__ == "__main__":
-    handler = NetworkRetryHandler(max_retries=3)
-    try:
-        settings = handler.execute(fetch_automation_settings, "https://example.com/api/settings")
-        print("Successfully retrieved settings:", settings)
-    except Exception as e:
-        print(f"Network operation failed after all retries: {e}")
+    def start(self, interval: Optional[float] = None) -> None:
+        """Begin the optimized clicking process."""
+        if self._is_running:
+            return
+        if interval is not None:
+            self.interval = max(0.001, interval)
+        self._is_running = True
+        self._click_counter = 0
+        self._worker_thread = threading.Thread(
+            target=self._optimized_loop, daemon=True
+        )
+        self._worker_thread.start()
+
+    def stop(self) -> None:
+        """Halt the autoclicker and join thread."""
+        self._is_running = False
+        if self._worker_thread is not None:
+            self._worker_thread.join(timeout=1.0)
+            self._worker_thread = None
+
+    def get_performance_stats(self) -> Dict[str, float]:
+        """Retrieve current performance metrics."""
+        with self._stats_lock:
+            if self._start_timestamp == 0.0:
+                return {"total_clicks": 0, "clicks_per_second": 0.0}
+            elapsed = time.perf_counter() - self._start_timestamp
+            cps = self._click_counter / elapsed if elapsed > 0 else 0.0
+            return {
+                "total_clicks": self._click_counter,
+                "clicks_per_second": round(cps, 2)
+            }
+
+    def update_interval(self, new_interval: float) -> None:
+        """Adjust interval for better performance."""
+        self.interval = max(0.001, new_interval)
