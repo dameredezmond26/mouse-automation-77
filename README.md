@@ -1,36 +1,29 @@
-# Mouse Automation 77
+# mouse-automation-77
 
-Mouse Automation 77 is a powerful Python-based autoclicker designed to streamline repetitive clicking tasks with precision and ease. Ideal for gamers, developers, and testers, this tool enhances productivity by automating mouse clicks with customizable settings.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+mouse-automation-77 is a Python autoclicker built for precise, repetitive mouse input. It handles high-frequency clicking with configurable timing and controls for testing, automation, and productivity tasks.
 
 ## Features
-
-- **Custom Click Rate**: Adjust the clicks per second to match specific requirements with precision.
-- **Hotkey Activation**: Easily start and stop the autoclicker with designated keyboard shortcuts, ensuring seamless control while using other applications.
-- **Multi-Click Modes**: Choose between single or double-click modes depending on your task, providing flexibility to cater to different environments.
-- **User-Friendly Interface**: Minimalistic command-line interface makes it easy for users of all skill levels to get started immediately.
+- Click intervals configurable down to 0.01 seconds
+- Support for left, right, and middle mouse buttons
+- Toggle automation using the F8 hotkey
+- Optional click limit with automatic termination
 
 ## Installation
 
-To set up Mouse Automation 77, ensure you have Python 3.x installed on your machine. Then you can clone the repository and install the required packages using the following commands:
-
 ```bash
-git clone https://github.com/yourusername/mouse-automation-77.git
+git clone https://github.com/Developer/mouse-automation-77.git
 cd mouse-automation-77
-pip install -r requirements.txt
+pip install pyautogui
 ```
 
-## Basic Usage
+## Usage
 
-Once installed, you can quickly start the autoclicker by running the following command:
+Run from the command line with your preferred settings:
 
 ```bash
-python autoclicker.py
+python main.py --interval 0.05 --button left --limit 500
 ```
 
-You will then have the option to set your click rate and toggle clicking with your specified hotkeys.
-
-## License
-
-![MIT License](https://img.shields.io/badge/license-MIT-green)
-
-Mouse Automation 77 is released under the MIT License, allowing for flexibility and openness in usage. Enjoy enhancing your workflow with this easy-to-use automation tool!
+This performs 500 left clicks at 50ms intervals. Press F8 during execution to stop the process early.
