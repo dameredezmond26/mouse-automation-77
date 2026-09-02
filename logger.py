@@ -1,46 +1,58 @@
 import logging
-
 from logging.handlers import RotatingFileHandler
-import os
+from pathlib import Path
 
-def setup_rotating_logger(
-    logger_name="mouse_automation",
-    log_file="logs/automation.log",
-    max_size_mb=5,
-    backup_count=3,
-    level=logging.INFO
-):
-    """Configure a logger with rotating file handler."""
-    # Get or create the logger instance
-    logger = logging.getLogger(logger_name)
-    # Check for existing handlers to avoid duplicates
+# Constants for logger configuration
+LOG_DIRECTORY = "logs"
+LOG_FILENAME = "automation.log"
+MAX_LOG_SIZE = 5 * 1024 * 1024  # 5 MB per file
+BACKUP_COUNT = 3  # Keep 3 backup files
+
+def setup_logger(log_level: int = logging.INFO) -> logging.Logger:
+    """
+    Set up a logger with console and rotating file handlers.
+    Creates log directory if needed and configures rotation.
+    """
+    # Ensure log directory exists
+    log_dir = Path(LOG_DIRECTORY)
+    log_dir.mkdir(parents=True, exist_ok=True)
+
+    log_file_path = log_dir / LOG_FILENAME
+
+    # Get or create logger
+    logger = logging.getLogger("mouse_automation_77")
+    logger.setLevel(log_level)
+
+    # Avoid adding duplicate handlers on multiple calls
     if logger.hasHandlers():
-        return logger
-    logger.setLevel(level)
-    # Prepare the log directory
-    log_dir = os.path.dirname(log_file)
-    if log_dir and not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-    # Calculate max bytes for rotation
-    max_bytes = max_size_mb * 1024 * 1024
-    # Set up the rotating file handler
+        logger.handlers.clear()
+
+    # Console handler for real-time output
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_format = logging.Formatter(
+        "%(asctime)s [%(levelname)s] %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S"
+    )
+    console_handler.setFormatter(console_format)
+    logger.addHandler(console_handler)
+
+    # Rotating file handler for persistent logs
     file_handler = RotatingFileHandler(
-        log_file,
-        maxBytes=max_bytes,
-        backupCount=backup_count,
+        filename=str(log_file_path),
+        maxBytes=MAX_LOG_SIZE,
+        backupCount=BACKUP_COUNT,
         encoding="utf-8"
     )
-    file_handler.setLevel(level)
-    # Use detailed format for file logs
-    file_formatter = logging.Formatter(
-        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    file_handler.setLevel(logging.DEBUG)
+    file_format = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(funcName)s:%(lineno)d - %(message)s"
     )
-    file_handler.setFormatter(file_formatter)
+    file_handler.setFormatter(file_format)
     logger.addHandler(file_handler)
-    # Add console output for important messages only
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.WARNING)
-    console_formatter = logging.Formatter("%(levelname)s: %(message)s")
-    console_handler.setFormatter(console_formatter)
-    logger.addHandler(console_handler)
+
+    logger.info("Logger initialized with rotation")
     return logger
+
+# Default logger instance for easy import and use
+logger = setup_logger()
