@@ -1,47 +1,34 @@
 import time
-import random
-from typing import Callable, Any
+import functools
+import requests
+import logging
 
-def retry_with_backoff(
-    operation: Callable[[], Any],
-    max_retries: int = 3,
-    base_delay: float = 1.0,
-    max_delay: float = 30.0,
-    jitter: bool = True
-) -> Any:
-    """
-    Execute a network operation with retry logic and exponential backoff.
-    """
-    last_exception = None
-    for attempt in range(max_retries):
-        try:
-            return operation()
-        except (ConnectionError, TimeoutError) as e:
-            last_exception = e
-            if attempt == max_retries - 1:
-                break
-            delay = min(base_delay * (2 ** attempt), max_delay)
-            if jitter:
-                delay *= (0.5 + random.random())
-            time.sleep(delay)
-    raise last_exception
+logger = logging.getLogger(__name__)
 
-# Example network operation function for demonstration
-def perform_network_request(url: str) -> str:
-    # In real use, this would use requests or urllib
-    # Simulating network call
-    print(f"Attempting to connect to {url}")
-    if random.random() < 0.6:
-        raise ConnectionError("Simulated network failure")
-    return "Network response received"
+def retry_network_op(retries=3, delay=2, backoff=2):
+    """Decorator for retrying network operations with exponential backoff."""
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper(*args, **kwargs):
+            current_delay = delay
+            for i in range(retries):
+                try:
+                    return func(*args, **kwargs)
+                except (requests.RequestException, ConnectionError) as e:
+                    if i == retries - 1:
+                        logger.error(f"Failed after {retries} attempts: {e}")
+                        raise
+                    
+                    logger.warning(f"Attempt {i+1} failed, retrying in {current_delay}s...")
+                    time.sleep(current_delay)
+                    current_delay *= backoff
+            return None
+        return wrapper
+    return decorator
 
-if __name__ == "__main__":
-    try:
-        result = retry_with_backoff(
-            lambda: perform_network_request("https://example.com"),
-            max_retries=4,
-            base_delay=0.5
-        )
-        print(result)
-    except Exception as e:
-        print(f"Operation failed after all retries: {e}")
+@retry_network_op(retries=3, delay=1)
+def fetch_remote_config(url):
+    """Fetch remote settings for mouse-automation-77."""
+    response = requests.get(url, timeout=5)
+    response.raise_for_status()
+    return response.json()
