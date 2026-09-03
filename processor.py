@@ -1,56 +1,54 @@
+import queue
+import threading
 import time
-import logging
+from typing import Any, Callable, Dict, Optional
 
-logger = logging.getLogger("mouse-automation-77")
 
 class ClickProcessor:
-    def __init__(self, config: dict):
-        self.config = config
-        self.running = False
+    """Handles the execution queue for scheduled autoclicker actions."""
 
-    def validate_inputs(self) -> bool:
-        """Validate autoclicker configuration parameters before execution."""
-        interval = self.config.get("interval")
-        clicks = self.config.get("clicks")
-        button = self.config.get("button")
+    def __init__(self, click_executor: Callable[[int, int, str], None]):
+        self._queue: queue.Queue[Dict[str, Any]] = queue.Queue()
+        self._is_running = False
+        self._thread: Optional[threading.Thread] = None
+        self._executor = click_executor
 
-        if interval is None or not isinstance(interval, (int, float)) or interval < 0:
-            logger.error("Invalid interval: must be a non-negative number.")
-            return False
-
-        if clicks is None or not isinstance(clicks, int) or clicks < -1:
-            logger.error("Invalid clicks: must be an integer >= -1 (-1 for infinite).")
-            return False
-
-        if button not in ["left", "right", "middle"]:
-            logger.error(f"Invalid mouse button: {button}. Must be left, right, or middle.")
-            return False
-
-        return True
-
-    def process_loop(self):
-        """Main processing loop with integrated input validation."""
-        if not self.validate_inputs():
-            logger.critical("Input validation failed. Aborting click process.")
+    def start(self) -> None:
+        """Starts the background worker thread for processing clicks."""
+        if self._is_running:
             return
+        self._is_running = True
+        self._thread = threading.Thread(target=self._process_loop, daemon=True)
+        self._thread.start()
 
-        self.running = True
-        interval = self.config["interval"]
-        target_clicks = self.config["clicks"]
-        executed = 0
+    def stop(self) -> None:
+        """Stops the processing loop and clears remaining tasks."""
+        self._is_running = False
+        if self._thread:
+            self._thread.join(timeout=1.0)
+        self.clear_queue()
 
-        logger.info("Starting autoclicker processing loop.")
-        try:
-            while self.running:
-                if target_clicks != -1 and executed >= target_clicks:
-                    logger.info("Target click count reached. Stopping.")
-                    break
-                
-                time.sleep(interval)
-                executed += 1
-                logger.debug(f"Click executed (#{executed})")
-        except Exception as e:
-            logger.exception(f"Unexpected error during processing loop: {e}")
-        finally:
-            self.running = False
-            logger.info("Autoclicker processing loop terminated.")
+    def queue_click(self, x: int, y: int, button: str = "left", delay: float = 0.0) -> None:
+        """Enqueues a click action with an optional pre-delay."""
+        self._queue.put({"x": x, "y": y, "button": button, "delay": delay})
+
+    def clear_queue(self) -> None:
+        """Removes all pending click events from the queue."""
+        while not self._queue.empty():
+            try:
+                self._queue.get_nowait()
+            except queue.Empty:
+                break
+
+    def _process_loop(self) -> None:
+        """Internal worker loop consuming click tasks from the queue."""
+        while self._is_running:
+            try:
+                task = self._queue.get(timeout=0.1)
+                if task["delay"] > 0:
+                    time.sleep(task["delay"])
+                if self._is_running:
+                    self._executor(task["x"], task["y"], task["button"])
+                self._queue.task_done()
+            except queue.Empty:
+                continue
