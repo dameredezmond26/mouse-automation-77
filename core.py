@@ -1,38 +1,43 @@
 import time
-import requests
-from functools import wraps
-from typing import Callable, Any
+import threading
+from pynput.mouse import Button, Controller
 
-def retry_on_failure(max_attempts: int = 3, delay: float = 1.0):
-    """Decorator to retry network operations on failure."""
-    def decorator(func: Callable):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            last_exception = None
-            for attempt in range(max_attempts):
-                try:
-                    return func(*args, **kwargs)
-                except (requests.RequestException, ConnectionError) as e:
-                    last_exception = e
-                    if attempt < max_attempts - 1:
-                        time.sleep(delay * (2 ** attempt))
-                        continue
-            raise last_exception
-        return wrapper
-    return decorator
+class AutoClicker:
+    """Core engine for managing background mouse click automation."""
+    
+    def __init__(self, interval: float = 0.1, button: Button = Button.left):
+        self.interval = interval
+        self.button = button
+        self.is_clicking = False
+        self.is_alive = True
+        self.mouse = Controller()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
 
-@retry_on_failure(max_attempts=3, delay=2)
-def fetch_remote_config(url: str) -> dict:
-    """Fetches remote configuration with built-in retry logic."""
-    response = requests.get(url, timeout=5)
-    response.raise_for_status()
-    return response.json()
+    def start(self) -> None:
+        """Enable active clicking."""
+        self.is_clicking = True
 
-def run_autoclicker_sync():
-    """Syncs configuration before starting automation cycle."""
-    config_url = "https://api.mouse-automation-77.io/v1/settings"
-    try:
-        settings = fetch_remote_config(config_url)
-        print(f"Sync successful: {settings.get('version')}")
-    except Exception as err:
-        print(f"Fatal sync error: {err}")
+    def stop(self) -> None:
+        """Pause active clicking."""
+        self.is_clicking = False
+
+    def toggle(self) -> None:
+        """Toggle clicking state."""
+        self.is_clicking = not self.is_clicking
+
+    def shutdown(self) -> None:
+        """Terminate the background thread."""
+        self.is_clicking = False
+        self.is_alive = False
+        if self._thread.is_alive():
+            self._thread.join(timeout=1.0)
+
+    def _run(self) -> None:
+        """Internal execution loop running in a daemon thread."""
+        while self.is_alive:
+            if self.is_clicking:
+                self.mouse.click(self.button)
+                time.sleep(self.interval)
+            else:
+                time.sleep(0.05)
