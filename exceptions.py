@@ -1,66 +1,41 @@
-"""Custom exceptions for mouse automation in autoclicker."""
+"""Custom exception hierarchy for the mouse-automation-77 autoclicker system."""
 
-class MouseAutomationError(Exception):
-    """Base exception for mouse automation errors."""
-    def __init__(self, message="An error occurred during mouse automation"):
-        super().__init__(message)
+
+class AutoclickerError(Exception):
+    """Base exception class for all mouse automation errors."""
+
+    def __init__(self, message: str = "An unexpected automation error occurred."):
         self.message = message
+        super().__init__(self.message)
 
-class CoordinateError(MouseAutomationError):
-    """Raised for invalid mouse coordinates."""
-    def __init__(self, x, y, message=None):
-        if message is None:
-            message = f"Invalid coordinates provided: ({x}, {y})"
-        super().__init__(message)
+
+class ConfigurationError(AutoclickerError):
+    """Raised when application configuration or hotkey settings are invalid."""
+
+    pass
+
+
+class ClickIntervalError(AutoclickerError):
+    """Raised when an invalid click delay or interval value is provided."""
+
+    def __init__(self, interval: float):
+        self.interval = interval
+        super().__init__(f"Invalid click interval specified: {interval}s (must be > 0).")
+
+
+class CoordinateOutOfBoundsError(AutoclickerError):
+    """Raised when target click coordinates fall outside display bounds."""
+
+    def __init__(self, x: int, y: int, screen_width: int, screen_height: int):
         self.x = x
         self.y = y
-
-class ClickError(MouseAutomationError):
-    """Raised when a mouse click fails."""
-    def __init__(self, button="left", message=None):
-        if message is None:
-            message = f"Failed to click with {button} button"
-        super().__init__(message)
-        self.button = button
-
-class TimingError(MouseAutomationError):
-    """Raised for invalid or failed timing in operations."""
-    def __init__(self, delay, message=None):
-        if message is None:
-            message = f"Timing error with delay of {delay} seconds"
-        super().__init__(message)
-        self.delay = delay
-
-class AutomationStoppedError(MouseAutomationError):
-    """Raised when the automation is stopped unexpectedly."""
-    def __init__(self, message="Automation was stopped"):
-        super().__init__(message)
+        self.screen_width = screen_width
+        self.screen_height = screen_height
+        msg = f"Target ({x}, {y}) out of screen bounds ({screen_width}x{screen_height})."
+        super().__init__(msg)
 
 
-def raise_for_operation(operation, **kwargs):
-    """Helper to raise appropriate exception for common operations."""
-    if operation == "move_mouse":
-        x = kwargs.get("x", 0)
-        y = kwargs.get("y", 0)
-        raise CoordinateError(x, y)
-    elif operation == "click":
-        button = kwargs.get("button", "left")
-        raise ClickError(button)
-    elif operation == "wait":
-        delay = kwargs.get("delay", 0)
-        raise TimingError(delay)
-    else:
-        raise MouseAutomationError(f"Unknown operation: {operation}")
+class AutomationStateError(AutoclickerError):
+    """Raised when an operation is invalid for current state (e.g. double start)."""
 
-def handle_common_error(error):
-    """Helper function to categorize and return info on common errors."""
-    if isinstance(error, CoordinateError):
-        return {"type": "coordinate", "details": str(error)}
-    elif isinstance(error, ClickError):
-        return {"type": "click", "details": str(error)}
-    elif isinstance(error, TimingError):
-        return {"type": "timing", "details": str(error)}
-    elif isinstance(error, AutomationStoppedError):
-        return {"type": "stopped", "details": str(error)}
-    else:
-        return {"type": "unknown", "details": str(error)}
+    pass
