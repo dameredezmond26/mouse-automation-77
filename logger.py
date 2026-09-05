@@ -1,48 +1,41 @@
+import os
 import logging
-import json
-from datetime import datetime
-from typing import Dict, Any
+from logging.handlers import RotatingFileHandler
 
+def get_logger(name: str = "autoclicker") -> logging.Logger:
+    """
+    Configures and returns a logger with console and rotating file handlers.
+    """
+    logger = logging.getLogger(name)
+    
+    # Prevent duplicate handlers if get_logger is called multiple times
+    if logger.handlers:
+        return logger
 
-class ClickLogger:
-    """Utility for logging autoclicker sessions and click telemetry data."""
+    logger.setLevel(logging.DEBUG)
 
-    def __init__(self, log_file: str = "autoclicker_session.log", verbose: bool = False):
-        self.logger = logging.getLogger("mouse_automation_logger")
-        self.logger.setLevel(logging.DEBUG if verbose else logging.INFO)
-        
-        handler = logging.FileHandler(log_file)
-        formatter = logging.Formatter(
-            "[%(asctime)s] %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
-        )
-        handler.setFormatter(formatter)
-        
-        if not self.logger.handlers:
-            self.logger.addHandler(handler)
+    # Create standard log format
+    formatter = logging.Formatter(
+        "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    )
 
-    def log_click_event(self, x: int, y: int, button: str, interval: float) -> str:
-        """Formats and logs an individual click event."""
-        event_data = {
-            "timestamp": datetime.utcnow().isoformat(),
-            "position": {"x": x, "y": y},
-            "button": button,
-            "interval_sec": round(interval, 4)
-        }
-        log_msg = f"CLICK: Pos=({x}, {y}) Button={button} Interval={interval:.4f}s"
-        self.logger.info(log_msg)
-        return json.dumps(event_data)
+    # Console handler for quick feedback (INFO level)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(formatter)
+    logger.addHandler(console_handler)
 
-    def log_session_summary(self, total_clicks: int, duration_sec: float, target_cps: float) -> Dict[str, Any]:
-        """Calculates session stats and outputs summary log."""
-        actual_cps = round(total_clicks / duration_sec, 2) if duration_sec > 0 else 0.0
-        summary = {
-            "total_clicks": total_clicks,
-            "duration_seconds": round(duration_sec, 2),
-            "target_cps": target_cps,
-            "actual_cps": actual_cps
-        }
-        self.logger.info(
-            f"SESSION SUMMARY: Total Clicks={total_clicks} | "
-            f"Duration={duration_sec:.2f}s | Avg CPS={actual_cps}"
-        )
-        return summary
+    # File handler with rotation for detailed history (DEBUG level)
+    log_dir = "logs"
+    os.makedirs(log_dir, exist_ok=True)
+    log_path = os.path.join(log_dir, "autoclicker.log")
+
+    # Rotate at 1MB size limit, keeping up to 5 backups
+    file_handler = RotatingFileHandler(
+        log_path, maxBytes=1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(formatter)
+    logger.addHandler(file_handler)
+
+    return logger
