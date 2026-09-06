@@ -1,30 +1,32 @@
-import sys
-from typing import Final
+import platform
 
-# Performance thresholds for input injection
-# Lower intervals increase CPU load significantly
-MIN_CLICK_INTERVAL: Final[float] = 0.001
-DEFAULT_CLICK_INTERVAL: Final[float] = 0.01
+# Application metadata
+APP_NAME = "mouse-automation-77"
+VERSION = "1.0.0"
 
-# Event buffering constants
-# Higher batch size reduces overhead in syscalls
-EVENT_BATCH_SIZE: Final[int] = 128
-MAX_QUEUE_LENGTH: Final[int] = 1024
+# Mouse button mappings
+LEFT_BUTTON = "left"
+RIGHT_BUTTON = "right"
+MIDDLE_BUTTON = "middle"
 
-# System specific optimization settings
-IS_WINDOWS: Final[bool] = sys.platform == 'win32'
-IS_LINUX: Final[bool] = sys.platform.startswith('linux')
+# Timing constraints
+MIN_CLICK_INTERVAL = 0.01
+DEFAULT_INTERVAL = 0.1
 
-# Threading priority flags
-# High priority helps maintain precision at low intervals
-THREAD_PRIORITY_HIGH: Final[int] = 1
-THREAD_PRIORITY_NORMAL: Final[int] = 0
+# Operating system detection
+IS_WINDOWS = platform.system() == "Windows"
+IS_MACOS = platform.system() == "Darwin"
+IS_LINUX = platform.system() == "Linux"
 
-# Input emulation event codes
-MOUSE_EVENT_LEFT_DOWN: Final[int] = 0x0002
-MOUSE_EVENT_LEFT_UP: Final[int] = 0x0004
-MOUSE_EVENT_RIGHT_DOWN: Final[int] = 0x0008
-MOUSE_EVENT_RIGHT_UP: Final[int] = 0x0010
+# Global keyboard hotkeys
+START_HOTKEY = "f6"
+STOP_HOTKEY = "f7"
+EXIT_HOTKEY = "esc"
 
-# Precision timing settings for internal loops
-PRECISION_SLEEP_THRESHOLD: Final[float] = 0.005
+# Configuration file defaults
+CONFIG_FILE = "settings.json"
+LOG_FILE = "automation.log"
+
+# UI constraints
+DEFAULT_WINDOW_SIZE = "400x300"
+THEME_COLOR = "#2c3e50"
