@@ -1,46 +1,33 @@
 import json
 import os
-from typing import Any, Dict
+from typing import Dict, Any
 
 DEFAULT_CONFIG = {
-    "click_interval": 0.1,  # in seconds
-    "button": "left",       # left, right, middle
-    "hotkey": "f8",         # toggle activation
-    "double_click": False,
-    "max_clicks": 0,        # 0 for infinite
+    "interval": 0.1,
+    "button": "left",
+    "repeat": 100,
+    "hotkey": "f8"
 }
 
-class ConfigLoader:
-    """Loads and manages configuration for the autoclicker application."""
-    def __init__(self, filepath: str = "config.json"):
-        self.filepath = filepath
-        self.config = self.load()
-
-    def load(self) -> Dict[str, Any]:
-        """Loads configuration from JSON file, merging with default options."""
-        config = DEFAULT_CONFIG.copy()
-        if os.path.exists(self.filepath):
-            try:
-                with open(self.filepath, 'r') as f:
-                    user_config = json.load(f)
-                    if isinstance(user_config, dict):
-                        for key, value in user_config.items():
-                            if key in config:
-                                config[key] = value
-            except (json.JSONDecodeError, IOError):
-                # Use defaults silently if file is corrupted or unreadable
-                pass
-        return config
-
-    def save(self) -> bool:
-        """Persists the current configuration state back to the disk."""
+def load_config(filepath: str = "config.json") -> Dict[str, Any]:
+    """
+    Loads configuration from json file with defaults fallback.
+    """
+    config = DEFAULT_CONFIG.copy()
+    
+    if os.path.exists(filepath):
         try:
-            with open(self.filepath, 'w') as f:
-                json.dump(self.config, f, indent=4)
-            return True
-        except IOError:
-            return False
+            with open(filepath, "r") as f:
+                user_config = json.load(f)
+                config.update(user_config)
+        except (json.JSONDecodeError, IOError):
+            pass
+            
+    return config
 
-    def get(self, key: str) -> Any:
-        """Safely retrieves a configuration key, utilizing defaults as a fallback."""
-        return self.config.get(key, DEFAULT_CONFIG.get(key))
+def save_config(config: Dict[str, Any], filepath: str = "config.json") -> None:
+    """
+    Saves current configuration to local json file.
+    """
+    with open(filepath, "w") as f:
+        json.dump(config, f, indent=4)
