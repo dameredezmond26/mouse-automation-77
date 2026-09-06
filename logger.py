@@ -1,41 +1,33 @@
-import os
 import logging
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 
-def get_logger(name: str = "autoclicker") -> logging.Logger:
-    """
-    Configures and returns a logger with console and rotating file handlers.
-    """
+def setup_logger(name: str = "mouse-automation-77") -> logging.Logger:
+    """Configures a rotating file logger for the application."""
     logger = logging.getLogger(name)
+    logger.setLevel(logging.INFO)
+
+    log_dir = Path("logs")
+    log_dir.mkdir(exist_ok=True)
+    log_file = log_dir / "automation.log"
+
+    # 5MB per file, keep 3 backup files
+    handler = RotatingFileHandler(
+        log_file, 
+        maxBytes=5 * 1024 * 1024, 
+        backupCount=3, 
+        encoding="utf-8"
+    )
     
-    # Prevent duplicate handlers if get_logger is called multiple times
-    if logger.handlers:
-        return logger
-
-    logger.setLevel(logging.DEBUG)
-
-    # Create standard log format
     formatter = logging.Formatter(
         "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
     )
+    handler.setFormatter(formatter)
 
-    # Console handler for quick feedback (INFO level)
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(formatter)
-    logger.addHandler(console_handler)
-
-    # File handler with rotation for detailed history (DEBUG level)
-    log_dir = "logs"
-    os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, "autoclicker.log")
-
-    # Rotate at 1MB size limit, keeping up to 5 backups
-    file_handler = RotatingFileHandler(
-        log_path, maxBytes=1024 * 1024, backupCount=5, encoding="utf-8"
-    )
-    file_handler.setLevel(logging.DEBUG)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
+    if not logger.handlers:
+        logger.addHandler(handler)
+        
     return logger
+
+# Initialize default logger instance
+logger = setup_logger()
