@@ -1,54 +1,56 @@
-import queue
-import threading
-import time
-from typing import Any, Callable, Dict, Optional
+import json
+from typing import Dict, List, Any
 
 
-class ClickProcessor:
-    """Handles the execution queue for scheduled autoclicker actions."""
+class ClickProfileProcessor:
+    """Processes, validates, and formats autoclicker sequence profile data."""
 
-    def __init__(self, click_executor: Callable[[int, int, str], None]):
-        self._queue: queue.Queue[Dict[str, Any]] = queue.Queue()
-        self._is_running = False
-        self._thread: Optional[threading.Thread] = None
-        self._executor = click_executor
+    VALID_BUTTONS = {"left", "right", "middle"}
 
-    def start(self) -> None:
-        """Starts the background worker thread for processing clicks."""
-        if self._is_running:
-            return
-        self._is_running = True
-        self._thread = threading.Thread(target=self._process_loop, daemon=True)
-        self._thread.start()
+    def __init__(self, default_delay_ms: int = 100):
+        self.default_delay_ms = default_delay_ms
 
-    def stop(self) -> None:
-        """Stops the processing loop and clears remaining tasks."""
-        self._is_running = False
-        if self._thread:
-            self._thread.join(timeout=1.0)
-        self.clear_queue()
+    def validate_click_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
+        """Validates coordinates, click button type, and delay parameters."""
+        x = int(event.get("x", 0))
+        y = int(event.get("y", 0))
+        if x < 0 or y < 0:
+            raise ValueError(f"Invalid coordinates ({x}, {y}): values must be non-negative")
 
-    def queue_click(self, x: int, y: int, button: str = "left", delay: float = 0.0) -> None:
-        """Enqueues a click action with an optional pre-delay."""
-        self._queue.put({"x": x, "y": y, "button": button, "delay": delay})
+        button = str(event.get("button", "left")).lower()
+        if button not in self.VALID_BUTTONS:
+            raise ValueError(f"Unsupported mouse button '{button}'")
 
-    def clear_queue(self) -> None:
-        """Removes all pending click events from the queue."""
-        while not self._queue.empty():
-            try:
-                self._queue.get_nowait()
-            except queue.Empty:
-                break
+        try:
+            delay_ms = max(0, int(event.get("delay_ms", self.default_delay_ms)))
+        except (ValueError, TypeError):
+            delay_ms = self.default_delay_ms
 
-    def _process_loop(self) -> None:
-        """Internal worker loop consuming click tasks from the queue."""
-        while self._is_running:
-            try:
-                task = self._queue.get(timeout=0.1)
-                if task["delay"] > 0:
-                    time.sleep(task["delay"])
-                if self._is_running:
-                    self._executor(task["x"], task["y"], task["button"])
-                self._queue.task_done()
-            except queue.Empty:
-                continue
+        return {
+            "x": x,
+            "y": y,
+            "button": button,
+            "delay_ms": delay_ms,
+            "double_click": bool(event.get("double_click", False))
+        }
+
+    def process_sequence(self, raw_events: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Processes a list of raw click actions into a validated execution script."""
+        validated_events = [self.validate_click_event(evt) for evt in raw_events]
+        total_duration = sum(evt["delay_ms"] for evt in validated_events)
+        click_count = len(validated_events)
+
+        return {
+            "summary": {
+                "total_clicks": click_count,
+                "total_duration_ms": total_duration,
+                "average_delay_ms": (total_duration / click_count) if click_count > 0 else 0.0
+            },
+            "events": validated_events
+        }
+
+    def save_profile(self, raw_events: List[Dict[str, Any]], filepath: str) -> None:
+        """Validates sequence payload and saves formatted profile to JSON."""
+        processed_data = self.process_sequence(raw_events)
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(processed_data, f, indent=2)
